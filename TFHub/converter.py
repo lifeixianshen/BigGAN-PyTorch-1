@@ -101,7 +101,7 @@ class TFHub2Pytorch(object):
     self.verbose = verbose
     if load_ema:
       for name in ['w', 'b', 'gamma', 'beta']:
-        setattr(self, name, getattr(self, name) + '/ema_b999900')
+        setattr(self, name, f'{getattr(self, name)}/ema_b999900')
 
   def load(self):
     self.load_generator()
@@ -123,16 +123,22 @@ class TFHub2Pytorch(object):
                     os.path.join(GENERATOR_ROOT, 'ScaledCrossReplicaBN'))
 
   def load_linear(self, name_pth, name_tf, bias=True):
-    self.state_dict[name_pth + '.weight'] = self.load_tf_tensor(name_tf, self.w).permute(1, 0)
+    self.state_dict[f'{name_pth}.weight'] = self.load_tf_tensor(name_tf,
+                                                                self.w).permute(
+                                                                    1, 0)
     if bias:
-      self.state_dict[name_pth + '.bias'] = self.load_tf_tensor(name_tf, self.b)
+      self.state_dict[f'{name_pth}.bias'] = self.load_tf_tensor(name_tf, self.b)
 
   def load_snlinear(self, name_pth, name_tf, bias=True):
-    self.state_dict[name_pth + '.module.weight_u'] = self.load_tf_tensor(name_tf, self.u).squeeze()
-    self.state_dict[name_pth + '.module.weight_v'] = self.load_tf_tensor(name_tf, self.v).squeeze()
-    self.state_dict[name_pth + '.module.weight_bar'] = self.load_tf_tensor(name_tf, self.w).permute(1, 0)
+    self.state_dict[f'{name_pth}.module.weight_u'] = self.load_tf_tensor(
+        name_tf, self.u).squeeze()
+    self.state_dict[f'{name_pth}.module.weight_v'] = self.load_tf_tensor(
+        name_tf, self.v).squeeze()
+    self.state_dict[f'{name_pth}.module.weight_bar'] = self.load_tf_tensor(
+        name_tf, self.w).permute(1, 0)
     if bias:
-      self.state_dict[name_pth + '.module.bias'] = self.load_tf_tensor(name_tf, self.b)
+      self.state_dict[f'{name_pth}.module.bias'] = self.load_tf_tensor(
+          name_tf, self.b)
 
   def load_colorize(self, name_pth, name_tf):
     self.load_snconv(name_pth, name_tf)
@@ -142,68 +148,95 @@ class TFHub2Pytorch(object):
     self.load_HyperBNs(name_pth, name_tf)
 
   def load_convs(self, name_pth, name_tf):
-    self.load_snconv(name_pth + 'conv0', os.path.join(name_tf, 'conv0'))
-    self.load_snconv(name_pth + 'conv1', os.path.join(name_tf, 'conv1'))
-    self.load_snconv(name_pth + 'conv_sc', os.path.join(name_tf, 'conv_sc'))
+    self.load_snconv(f'{name_pth}conv0', os.path.join(name_tf, 'conv0'))
+    self.load_snconv(f'{name_pth}conv1', os.path.join(name_tf, 'conv1'))
+    self.load_snconv(f'{name_pth}conv_sc', os.path.join(name_tf, 'conv_sc'))
 
   def load_snconv(self, name_pth, name_tf, bias=True):
     if self.verbose:
       print(f'loading: {name_pth} from {name_tf}')
-    self.state_dict[name_pth + '.module.weight_u'] = self.load_tf_tensor(name_tf, self.u).squeeze()
-    self.state_dict[name_pth + '.module.weight_v'] = self.load_tf_tensor(name_tf, self.v).squeeze()
-    self.state_dict[name_pth + '.module.weight_bar'] = self.load_tf_tensor(name_tf, self.w).permute(3, 2, 0, 1)
+    self.state_dict[f'{name_pth}.module.weight_u'] = self.load_tf_tensor(
+        name_tf, self.u).squeeze()
+    self.state_dict[f'{name_pth}.module.weight_v'] = self.load_tf_tensor(
+        name_tf, self.v).squeeze()
+    self.state_dict[f'{name_pth}.module.weight_bar'] = self.load_tf_tensor(
+        name_tf, self.w).permute(3, 2, 0, 1)
     if bias:
-      self.state_dict[name_pth + '.module.bias'] = self.load_tf_tensor(name_tf, self.b).squeeze()
+      self.state_dict[f'{name_pth}.module.bias'] = self.load_tf_tensor(
+          name_tf, self.b).squeeze()
 
   def load_conv(self, name_pth, name_tf, bias=True):
 
-    self.state_dict[name_pth + '.weight_u'] = self.load_tf_tensor(name_tf, self.u).squeeze()
-    self.state_dict[name_pth + '.weight_v'] = self.load_tf_tensor(name_tf, self.v).squeeze()
-    self.state_dict[name_pth + '.weight_bar'] = self.load_tf_tensor(name_tf, self.w).permute(3, 2, 0, 1)
+    self.state_dict[f'{name_pth}.weight_u'] = self.load_tf_tensor(
+        name_tf, self.u).squeeze()
+    self.state_dict[f'{name_pth}.weight_v'] = self.load_tf_tensor(
+        name_tf, self.v).squeeze()
+    self.state_dict[f'{name_pth}.weight_bar'] = self.load_tf_tensor(
+        name_tf, self.w).permute(3, 2, 0, 1)
     if bias:
-      self.state_dict[name_pth + '.bias'] = self.load_tf_tensor(name_tf, self.b)
+      self.state_dict[f'{name_pth}.bias'] = self.load_tf_tensor(name_tf, self.b)
 
   def load_HyperBNs(self, name_pth, name_tf):
-    self.load_HyperBN(name_pth + 'HyperBN', os.path.join(name_tf, 'HyperBN'))
-    self.load_HyperBN(name_pth + 'HyperBN_1', os.path.join(name_tf, 'HyperBN_1'))
+    self.load_HyperBN(f'{name_pth}HyperBN', os.path.join(name_tf, 'HyperBN'))
+    self.load_HyperBN(f'{name_pth}HyperBN_1', os.path.join(name_tf, 'HyperBN_1'))
 
   def load_ScaledCrossReplicaBNs(self, name_pth, name_tf):
-    self.state_dict[name_pth + '.bias'] = self.load_tf_tensor(name_tf, self.beta).squeeze()
-    self.state_dict[name_pth + '.weight'] = self.load_tf_tensor(name_tf, self.gamma).squeeze()
-    self.state_dict[name_pth + '.running_mean'] = self.load_tf_tensor(name_tf + 'bn', 'accumulated_mean')
-    self.state_dict[name_pth + '.running_var'] = self.load_tf_tensor(name_tf + 'bn', 'accumulated_var')
-    self.state_dict[name_pth + '.num_batches_tracked'] = torch.tensor(
-      self.tf_weights[os.path.join(name_tf + 'bn', 'accumulation_counter:0')][()], dtype=torch.float32)
+    self.state_dict[f'{name_pth}.bias'] = self.load_tf_tensor(
+        name_tf, self.beta).squeeze()
+    self.state_dict[f'{name_pth}.weight'] = self.load_tf_tensor(
+        name_tf, self.gamma).squeeze()
+    self.state_dict[f'{name_pth}.running_mean'] = self.load_tf_tensor(
+        f'{name_tf}bn', 'accumulated_mean')
+    self.state_dict[f'{name_pth}.running_var'] = self.load_tf_tensor(
+        f'{name_tf}bn', 'accumulated_var')
+    self.state_dict[f'{name_pth}.num_batches_tracked'] = torch.tensor(
+        self.tf_weights[os.path.join(f'{name_tf}bn',
+                                     'accumulation_counter:0')][()],
+        dtype=torch.float32,
+    )
 
   def load_HyperBN(self, name_pth, name_tf):
     if self.verbose:
       print(f'loading: {name_pth} from {name_tf}')
-    beta = name_pth + '.beta_embed.module'
-    gamma = name_pth + '.gamma_embed.module'
-    self.state_dict[beta + '.weight_u'] = self.load_tf_tensor(os.path.join(name_tf, 'beta'), self.u).squeeze()
-    self.state_dict[gamma + '.weight_u'] = self.load_tf_tensor(os.path.join(name_tf, 'gamma'), self.u).squeeze()
-    self.state_dict[beta + '.weight_v'] = self.load_tf_tensor(os.path.join(name_tf, 'beta'), self.v).squeeze()
-    self.state_dict[gamma + '.weight_v'] = self.load_tf_tensor(os.path.join(name_tf, 'gamma'), self.v).squeeze()
-    self.state_dict[beta + '.weight_bar'] = self.load_tf_tensor(os.path.join(name_tf, 'beta'), self.w).permute(1, 0)
+    beta = f'{name_pth}.beta_embed.module'
+    gamma = f'{name_pth}.gamma_embed.module'
+    self.state_dict[f'{beta}.weight_u'] = self.load_tf_tensor(
+        os.path.join(name_tf, 'beta'), self.u).squeeze()
+    self.state_dict[f'{gamma}.weight_u'] = self.load_tf_tensor(
+        os.path.join(name_tf, 'gamma'), self.u).squeeze()
+    self.state_dict[f'{beta}.weight_v'] = self.load_tf_tensor(
+        os.path.join(name_tf, 'beta'), self.v).squeeze()
+    self.state_dict[f'{gamma}.weight_v'] = self.load_tf_tensor(
+        os.path.join(name_tf, 'gamma'), self.v).squeeze()
+    self.state_dict[f'{beta}.weight_bar'] = self.load_tf_tensor(
+        os.path.join(name_tf, 'beta'), self.w).permute(1, 0)
     self.state_dict[gamma +
             '.weight_bar'] = self.load_tf_tensor(os.path.join(name_tf, 'gamma'), self.w).permute(1, 0)
 
     cr_bn_name = name_tf.replace('HyperBN', 'CrossReplicaBN')
-    self.state_dict[name_pth + '.bn.running_mean'] = self.load_tf_tensor(cr_bn_name, 'accumulated_mean')
-    self.state_dict[name_pth + '.bn.running_var'] = self.load_tf_tensor(cr_bn_name, 'accumulated_var')
-    self.state_dict[name_pth + '.bn.num_batches_tracked'] = torch.tensor(
-      self.tf_weights[os.path.join(cr_bn_name, 'accumulation_counter:0')][()], dtype=torch.float32)
+    self.state_dict[f'{name_pth}.bn.running_mean'] = self.load_tf_tensor(
+        cr_bn_name, 'accumulated_mean')
+    self.state_dict[f'{name_pth}.bn.running_var'] = self.load_tf_tensor(
+        cr_bn_name, 'accumulated_var')
+    self.state_dict[f'{name_pth}.bn.num_batches_tracked'] = torch.tensor(
+        self.tf_weights[os.path.join(cr_bn_name, 'accumulation_counter:0')][()],
+        dtype=torch.float32,
+    )
 
   def load_attention(self, name_pth, name_tf):
 
-    self.load_snconv(name_pth + 'theta', os.path.join(name_tf, 'theta'), bias=False)
-    self.load_snconv(name_pth + 'phi', os.path.join(name_tf, 'phi'), bias=False)
-    self.load_snconv(name_pth + 'g', os.path.join(name_tf, 'g'), bias=False)
-    self.load_snconv(name_pth + 'o_conv', os.path.join(name_tf, 'o_conv'), bias=False)
-    self.state_dict[name_pth + 'gamma'] = self.load_tf_tensor(name_tf, self.gamma)
+    self.load_snconv(f'{name_pth}theta',
+                     os.path.join(name_tf, 'theta'),
+                     bias=False)
+    self.load_snconv(f'{name_pth}phi', os.path.join(name_tf, 'phi'), bias=False)
+    self.load_snconv(f'{name_pth}g', os.path.join(name_tf, 'g'), bias=False)
+    self.load_snconv(f'{name_pth}o_conv',
+                     os.path.join(name_tf, 'o_conv'),
+                     bias=False)
+    self.state_dict[f'{name_pth}gamma'] = self.load_tf_tensor(name_tf, self.gamma)
 
   def load_tf_tensor(self, prefix, var, device='0'):
-    name = os.path.join(prefix, var) + f':{device}'
+    name = f'{os.path.join(prefix, var)}:{device}'
     return torch.from_numpy(self.tf_weights[name][:])
 
 # Convert from v1: This function maps 
@@ -289,22 +322,36 @@ def convert_from_v1(hub_dict, resolution=128):
 def get_config(resolution):
   attn_dict = {128: '64', 256: '128', 512: '64'}
   dim_z_dict = {128: 120, 256: 140, 512: 128}
-  config = {'G_param': 'SN', 'D_param': 'SN', 
-           'G_ch': 96, 'D_ch': 96, 
-           'D_wide': True, 'G_shared': True, 
-           'shared_dim': 128, 'dim_z': dim_z_dict[resolution], 
-           'hier': True, 'cross_replica': False, 
-           'mybn': False, 'G_activation': nn.ReLU(inplace=True),
-           'G_attn': attn_dict[resolution],
-           'norm_style': 'bn',
-           'G_init': 'ortho', 'skip_init': True, 'no_optim': True,
-           'G_fp16': False, 'G_mixed_precision': False,
-           'accumulate_stats': False, 'num_standing_accumulations': 16, 
-           'G_eval_mode': True,
-           'BN_eps': 1e-04, 'SN_eps': 1e-04, 
-           'num_G_SVs': 1, 'num_G_SV_itrs': 1, 'resolution': resolution, 
-           'n_classes': 1000}
-  return config
+  return {
+      'G_param': 'SN',
+      'D_param': 'SN',
+      'G_ch': 96,
+      'D_ch': 96,
+      'D_wide': True,
+      'G_shared': True,
+      'shared_dim': 128,
+      'dim_z': dim_z_dict[resolution],
+      'hier': True,
+      'cross_replica': False,
+      'mybn': False,
+      'G_activation': nn.ReLU(inplace=True),
+      'G_attn': attn_dict[resolution],
+      'norm_style': 'bn',
+      'G_init': 'ortho',
+      'skip_init': True,
+      'no_optim': True,
+      'G_fp16': False,
+      'G_mixed_precision': False,
+      'accumulate_stats': False,
+      'num_standing_accumulations': 16,
+      'G_eval_mode': True,
+      'BN_eps': 1e-04,
+      'SN_eps': 1e-04,
+      'num_G_SVs': 1,
+      'num_G_SV_itrs': 1,
+      'resolution': resolution,
+      'n_classes': 1000,
+  }
 
 
 def convert_biggan(resolution, weight_dir, redownload=False, no_ema=False, verbose=False):
@@ -372,9 +419,8 @@ def parse_args():
     help='Batch size used for test sample.')
   parser.add_argument(
     '--parallel', action='store_true', default=False,
-    help='Parallelize G?')     
-  args = parser.parse_args()
-  return args
+    help='Parallelize G?')
+  return parser.parse_args()
 
 
 if __name__ == '__main__':

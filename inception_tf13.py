@@ -73,6 +73,7 @@ def run(config):
         kl = np.mean(np.sum(kl, 1))
         scores.append(np.exp(kl))
       return np.mean(scores), np.std(scores), np.squeeze(np.concatenate(pools, 0))
+
   # Init inception
   def _init_inception():
     global softmax, pool3
@@ -117,15 +118,21 @@ def run(config):
   # if softmax is None: # No need to functionalize like this.
   _init_inception()
 
-  fname = '%s/%s/samples.npz' % (config['experiment_root'], config['experiment_name'])
-  print('loading %s ...'%fname)
+  fname = f"{config['experiment_root']}/{config['experiment_name']}/samples.npz"
+  print(f'loading {fname} ...')
   ims = np.load(fname)['x']
   import time
   t0 = time.time()
   inc_mean, inc_std, pool_activations = get_inception_score(list(ims.swapaxes(1,2).swapaxes(2,3)), splits=10)
   t1 = time.time()
   print('Saving pool to numpy file for FID calculations...')
-  np.savez('%s/%s/TF_pool.npz' % (config['experiment_root'], config['experiment_name']), **{'pool_mean': np.mean(pool_activations,axis=0), 'pool_var': np.cov(pool_activations, rowvar=False)})
+  np.savez(
+      f"{config['experiment_root']}/{config['experiment_name']}/TF_pool.npz",
+      **{
+          'pool_mean': np.mean(pool_activations, axis=0),
+          'pool_var': np.cov(pool_activations, rowvar=False),
+      },
+  )
   print('Inception took %3f seconds, score of %3f +/- %3f.'%(t1-t0, inc_mean, inc_std))
 def main():
   # parse command line and run

@@ -48,7 +48,7 @@ def run(config):
     config['skip_init'] = True
   config = utils.update_config_roots(config)
   device = 'cuda'
-  
+
   # Seed RNG
   utils.seed_rng(config['seed'])
 
@@ -62,21 +62,20 @@ def run(config):
   model = __import__(config['model'])
   experiment_name = (config['experiment_name'] if config['experiment_name']
                        else utils.name_from_config(config))
-  print('Experiment name is %s' % experiment_name)
+  print(f'Experiment name is {experiment_name}')
 
   # Next, build the model
   G = model.Generator(**config).to(device)
   D = model.Discriminator(**config).to(device)
-  
-   # If using EMA, prepare it
+
   if config['ema']:
-    print('Preparing EMA for G with decay of {}'.format(config['ema_decay']))
+    print(f"Preparing EMA for G with decay of {config['ema_decay']}")
     G_ema = model.Generator(**{**config, 'skip_init':True, 
                                'no_optim': True}).to(device)
     ema = utils.ema(G, G_ema, config['ema_decay'], config['ema_start'])
   else:
     G_ema, ema = None, None
-  
+
   # FP16?
   if config['G_fp16']:
     print('Casting G to float16...')
@@ -91,7 +90,7 @@ def run(config):
   print(G)
   print(D)
   print('Number of params in G: {} D: {}'.format(
-    *[sum([p.data.nelement() for p in net.parameters()]) for net in [G,D]]))
+      *[sum(p.data.nelement() for p in net.parameters()) for net in [G, D]]))
   # Prepare state dict, which holds things like epoch # and itr #
   state_dict = {'itr': 0, 'epoch': 0, 'save_num': 0, 'save_best_num': 0,
                 'best_IS': 0, 'best_FID': 999999, 'config': config}
@@ -112,13 +111,12 @@ def run(config):
 
   # Prepare loggers for stats; metrics holds test metrics,
   # lmetrics holds any desired training metrics.
-  test_metrics_fname = '%s/%s_log.jsonl' % (config['logs_root'],
-                                            experiment_name)
-  train_metrics_fname = '%s/%s' % (config['logs_root'], experiment_name)
-  print('Inception Metrics will be saved to {}'.format(test_metrics_fname))
+  test_metrics_fname = f"{config['logs_root']}/{experiment_name}_log.jsonl"
+  train_metrics_fname = f"{config['logs_root']}/{experiment_name}"
+  print(f'Inception Metrics will be saved to {test_metrics_fname}')
   test_log = utils.MetricsLogger(test_metrics_fname, 
                                  reinitialize=(not config['resume']))
-  print('Training Metrics will be saved to {}'.format(train_metrics_fname))
+  print(f'Training Metrics will be saved to {train_metrics_fname}')
   train_log = utils.MyLogger(train_metrics_fname, 
                              reinitialize=(not config['resume']),
                              logstyle=config['logstyle'])
@@ -144,7 +142,7 @@ def run(config):
   # Prepare a fixed z & y to see individual sample evolution throghout training
   fixed_z, fixed_y = utils.prepare_z_y(G_batch_size, G.dim_z,
                                        config['n_classes'], device=device,
-                                       fp16=config['G_fp16'])  
+                                       fp16=config['G_fp16'])
   fixed_z.sample_()
   fixed_y.sample_()
   # Loaders are loaded, prepare the training function
@@ -162,12 +160,12 @@ def run(config):
 
   print('Beginning training at epoch %d...' % state_dict['epoch'])
   # Train for specified number of epochs, although we mostly track G iterations.
-  for epoch in range(state_dict['epoch'], config['num_epochs']):    
+  for _ in range(state_dict['epoch'], config['num_epochs']):
     # Which progressbar to use? TQDM or my own?
-    if config['pbar'] == 'mine':
-      pbar = utils.progress(loaders[0],displaytype='s1k' if config['use_multiepoch_sampler'] else 'eta')
-    else:
-      pbar = tqdm(loaders[0])
+    pbar = (utils.progress(
+        loaders[0],
+        displaytype='s1k' if config['use_multiepoch_sampler'] else 'eta',
+    ) if config['pbar'] == 'mine' else tqdm(loaders[0]))
     for i, (x, y) in enumerate(pbar):
       # Increment the iteration counter
       state_dict['itr'] += 1
@@ -183,7 +181,7 @@ def run(config):
         x, y = x.to(device), y.to(device)
       metrics = train(x, y)
       train_log.log(itr=int(state_dict['itr']), **metrics)
-      
+
       # Every sv_log_interval, log singular values
       if (config['sv_log_interval'] > 0) and (not (state_dict['itr'] % config['sv_log_interval'])):
         train_log.log(itr=int(state_dict['itr']), 

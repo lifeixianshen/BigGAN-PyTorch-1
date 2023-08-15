@@ -34,9 +34,9 @@ class SpectralNorm(nn.Module):
       self._make_params()
 
   def _update_u_v(self):
-    u = getattr(self.module, self.name + "_u")
-    v = getattr(self.module, self.name + "_v")
-    w = getattr(self.module, self.name + "_bar")
+    u = getattr(self.module, f"{self.name}_u")
+    v = getattr(self.module, f"{self.name}_v")
+    w = getattr(self.module, f"{self.name}_bar")
 
     height = w.data.shape[0]
     _w = w.view(height, -1)
@@ -49,9 +49,9 @@ class SpectralNorm(nn.Module):
 
   def _made_params(self):
     try:
-      getattr(self.module, self.name + "_u")
-      getattr(self.module, self.name + "_v")
-      getattr(self.module, self.name + "_bar")
+      getattr(self.module, f"{self.name}_u")
+      getattr(self.module, f"{self.name}_v")
+      getattr(self.module, f"{self.name}_bar")
       return True
     except AttributeError:
       return False
@@ -69,9 +69,9 @@ class SpectralNorm(nn.Module):
     w_bar = Parameter(w.data)
 
     del self.module._parameters[self.name]
-    self.module.register_parameter(self.name + "_u", u)
-    self.module.register_parameter(self.name + "_v", v)
-    self.module.register_parameter(self.name + "_bar", w_bar)
+    self.module.register_parameter(f"{self.name}_u", u)
+    self.module.register_parameter(f"{self.name}_v", v)
+    self.module.register_parameter(f"{self.name}_bar", w_bar)
 
   def forward(self, *args):
     self._update_u_v()
@@ -182,15 +182,13 @@ class GBlock(nn.Module):
     if self.downsample:
       out = F.avg_pool2d(out, 2)
 
+    skip = input
     if self.skip_proj:
-      skip = input
       if self.upsample:
         skip = F.interpolate(skip, scale_factor=2)
       skip = self.conv_sc(skip)
       if self.downsample:
         skip = F.avg_pool2d(skip, 2)
-    else:
-      skip = input
     return out + skip
 
 

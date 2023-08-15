@@ -55,7 +55,7 @@ def run(config):
   net = inception_utils.load_inception_net(parallel=config['parallel'])
   pool, logits, labels = [], [], []
   device = 'cuda'
-  for i, (x, y) in enumerate(tqdm(loaders[0])):
+  for x, y in tqdm(loaders[0]):
     x = x.to(device)
     with torch.no_grad():
       pool_val, logits_val = net(x)

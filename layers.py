@@ -307,25 +307,21 @@ class ccbn(nn.Module):
     # Calculate class-conditional gains and biases
     gain = (1 + self.gain(y)).view(y.size(0), -1, 1, 1)
     bias = self.bias(y).view(y.size(0), -1, 1, 1)
-    # If using my batchnorm
     if self.mybn or self.cross_replica:
       return self.bn(x, gain=gain, bias=bias)
-    # else:
-    else:
-      if self.norm_style == 'bn':
-        out = F.batch_norm(x, self.stored_mean, self.stored_var, None, None,
-                          self.training, 0.1, self.eps)
-      elif self.norm_style == 'in':
-        out = F.instance_norm(x, self.stored_mean, self.stored_var, None, None,
-                          self.training, 0.1, self.eps)
-      elif self.norm_style == 'gn':
-        out = groupnorm(x, self.normstyle)
-      elif self.norm_style == 'nonorm':
-        out = x
-      return out * gain + bias
+    if self.norm_style == 'bn':
+      out = F.batch_norm(x, self.stored_mean, self.stored_var, None, None,
+                        self.training, 0.1, self.eps)
+    elif self.norm_style == 'in':
+      out = F.instance_norm(x, self.stored_mean, self.stored_var, None, None,
+                        self.training, 0.1, self.eps)
+    elif self.norm_style == 'gn':
+      out = groupnorm(x, self.normstyle)
+    elif self.norm_style == 'nonorm':
+      out = x
+    return out * gain + bias
   def extra_repr(self):
-    s = 'out: {output_size}, in: {input_size},'
-    s +=' cross_replica={cross_replica}'
+    s = 'out: {output_size}, in: {input_size},' + ' cross_replica={cross_replica}'
     return s.format(**self.__dict__)
 
 
@@ -420,11 +416,11 @@ class DBlock(nn.Module):
     self.preactivation = preactivation
     self.activation = activation
     self.downsample = downsample
-        
+
     # Conv layers
     self.conv1 = self.which_conv(self.in_channels, self.hidden_channels)
     self.conv2 = self.which_conv(self.hidden_channels, self.out_channels)
-    self.learnable_sc = True if (in_channels != out_channels) or downsample else False
+    self.learnable_sc = bool((in_channels != out_channels) or downsample)
     if self.learnable_sc:
       self.conv_sc = self.which_conv(in_channels, out_channels, 
                                      kernel_size=1, padding=0)
@@ -442,18 +438,12 @@ class DBlock(nn.Module):
     return x
     
   def forward(self, x):
-    if self.preactivation:
-      # h = self.activation(x) # NOT TODAY SATAN
-      # Andy's note: This line *must* be an out-of-place ReLU or it 
-      #              will negatively affect the shortcut connection.
-      h = F.relu(x)
-    else:
-      h = x    
+    h = F.relu(x) if self.preactivation else x
     h = self.conv1(h)
     h = self.conv2(self.activation(h))
     if self.downsample:
       h = self.downsample(h)     
-        
+
     return h + self.shortcut(x)
     
 # dogball

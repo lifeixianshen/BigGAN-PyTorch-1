@@ -17,13 +17,18 @@ from sync_batchnorm import SynchronizedBatchNorm2d as SyncBatchNorm2d
 # Attention is passed in in the format '32_64' to mean applying an attention
 # block at both resolution 32x32 and 64x64. Just '64' will apply at 64x64.
 def G_arch(ch=64, attention='64', ksize='333333', dilation='111111'):
-  arch = {}
-  arch[512] = {'in_channels' :  [ch * item for item in [16, 16, 8, 8, 4, 2, 1]],
-               'out_channels' : [ch * item for item in [16,  8, 8, 4, 2, 1, 1]],
-               'upsample' : [True] * 7,
-               'resolution' : [8, 16, 32, 64, 128, 256, 512],
-               'attention' : {2**i: (2**i in [int(item) for item in attention.split('_')])
-                              for i in range(3,10)}}
+  arch = {
+      512: {
+          'in_channels': [ch * item for item in [16, 16, 8, 8, 4, 2, 1]],
+          'out_channels': [ch * item for item in [16, 8, 8, 4, 2, 1, 1]],
+          'upsample': [True] * 7,
+          'resolution': [8, 16, 32, 64, 128, 256, 512],
+          'attention': {
+              2**i: (2**i in [int(item) for item in attention.split('_')])
+              for i in range(3, 10)
+          },
+      }
+  }
   arch[256] = {'in_channels' :  [ch * item for item in [16, 16, 8, 8, 4, 2]],
                'out_channels' : [ch * item for item in [16,  8, 8, 4, 2, 1]],
                'upsample' : [True] * 6,
@@ -209,9 +214,7 @@ class Generator(nn.Module):
   def init_weights(self):
     self.param_count = 0
     for module in self.modules():
-      if (isinstance(module, nn.Conv2d) 
-          or isinstance(module, nn.Linear) 
-          or isinstance(module, nn.Embedding)):
+      if isinstance(module, (nn.Conv2d, nn.Linear, nn.Embedding)):
         if self.init == 'ortho':
           init.orthogonal_(module.weight)
         elif self.init == 'N02':
@@ -220,7 +223,7 @@ class Generator(nn.Module):
           init.xavier_uniform_(module.weight)
         else:
           print('Init style not recognized...')
-        self.param_count += sum([p.data.nelement() for p in module.parameters()])
+        self.param_count += sum(p.data.nelement() for p in module.parameters())
     print('Param count for G''s initialized parameters: %d' % self.param_count)
 
   # Note on this forward function: we pass in a y vector which has
@@ -253,13 +256,18 @@ class Generator(nn.Module):
 
 # Discriminator architecture, same paradigm as G's above
 def D_arch(ch=64, attention='64',ksize='333333', dilation='111111'):
-  arch = {}
-  arch[256] = {'in_channels' :  [3] + [ch*item for item in [1, 2, 4, 8, 8, 16]],
-               'out_channels' : [item * ch for item in [1, 2, 4, 8, 8, 16, 16]],
-               'downsample' : [True] * 6 + [False],
-               'resolution' : [128, 64, 32, 16, 8, 4, 4 ],
-               'attention' : {2**i: 2**i in [int(item) for item in attention.split('_')]
-                              for i in range(2,8)}}
+  arch = {
+      256: {
+          'in_channels': [3] + [ch * item for item in [1, 2, 4, 8, 8, 16]],
+          'out_channels': [item * ch for item in [1, 2, 4, 8, 8, 16, 16]],
+          'downsample': [True] * 6 + [False],
+          'resolution': [128, 64, 32, 16, 8, 4, 4],
+          'attention': {
+              2**i: 2**i in [int(item) for item in attention.split('_')]
+              for i in range(2, 8)
+          },
+      }
+  }
   arch[128] = {'in_channels' :  [3] + [ch*item for item in [1, 2, 4, 8, 16]],
                'out_channels' : [item * ch for item in [1, 2, 4, 8, 16, 16]],
                'downsample' : [True] * 5 + [False],
@@ -374,9 +382,7 @@ class Discriminator(nn.Module):
   def init_weights(self):
     self.param_count = 0
     for module in self.modules():
-      if (isinstance(module, nn.Conv2d)
-          or isinstance(module, nn.Linear)
-          or isinstance(module, nn.Embedding)):
+      if isinstance(module, (nn.Conv2d, nn.Linear, nn.Embedding)):
         if self.init == 'ortho':
           init.orthogonal_(module.weight)
         elif self.init == 'N02':
@@ -385,14 +391,14 @@ class Discriminator(nn.Module):
           init.xavier_uniform_(module.weight)
         else:
           print('Init style not recognized...')
-        self.param_count += sum([p.data.nelement() for p in module.parameters()])
+        self.param_count += sum(p.data.nelement() for p in module.parameters())
     print('Param count for D''s initialized parameters: %d' % self.param_count)
 
   def forward(self, x, y=None):
     # Stick x into h for cleaner for loops without flow control
     h = x
     # Loop over blocks
-    for index, blocklist in enumerate(self.blocks):
+    for blocklist in self.blocks:
       for block in blocklist:
         h = block(h)
     # Apply global sum pooling as in SN-GAN
@@ -426,16 +432,10 @@ class G_D(nn.Module):
     # rather than concatenating along the batch dimension.
     if split_D:
       D_fake = self.D(G_z, gy)
-      if x is not None:
-        D_real = self.D(x, dy)
-        return D_fake, D_real
-      else:
-        if return_G_z:
-          return D_fake, G_z
-        else:
-          return D_fake
-    # If real data is provided, concatenate it with the Generator's output
-    # along the batch dimension for improved efficiency.
+      if x is None:
+        return (D_fake, G_z) if return_G_z else D_fake
+      D_real = self.D(x, dy)
+      return D_fake, D_real
     else:
       D_input = torch.cat([G_z, x], 0) if x is not None else G_z
       D_class = torch.cat([gy, dy], 0) if dy is not None else gy
@@ -444,7 +444,4 @@ class G_D(nn.Module):
       if x is not None:
         return torch.split(D_out, [G_z.shape[0], x.shape[0]]) # D_fake, D_real
       else:
-        if return_G_z:
-          return D_out, G_z
-        else:
-          return D_out
+        return (D_out, G_z) if return_G_z else D_out

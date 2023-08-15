@@ -84,13 +84,12 @@ def run(config):
       with h5.File(config['data_root'] + '/ILSVRC%i.hdf5' % config['image_size'], 'w') as f:
         print('Producing dataset of len %d' % len(train_loader.dataset))
         imgs_dset = f.create_dataset('imgs', x.shape,dtype='uint8', maxshape=(len(train_loader.dataset), 3, config['image_size'], config['image_size']),
-                                     chunks=(config['chunk_size'], 3, config['image_size'], config['image_size']), compression=config['compression']) 
-        print('Image chunks chosen as ' + str(imgs_dset.chunks))
+                                     chunks=(config['chunk_size'], 3, config['image_size'], config['image_size']), compression=config['compression'])
+        print(f'Image chunks chosen as {str(imgs_dset.chunks)}')
         imgs_dset[...] = x
         labels_dset = f.create_dataset('labels', y.shape, dtype='int64', maxshape=(len(train_loader.dataset),), chunks=(config['chunk_size'],), compression=config['compression'])
-        print('Label chunks chosen as ' + str(labels_dset.chunks))
+        print(f'Label chunks chosen as {str(labels_dset.chunks)}')
         labels_dset[...] = y
-    # Else append to the hdf5
     else:
       with h5.File(config['data_root'] + '/ILSVRC%i.hdf5' % config['image_size'], 'a') as f:
         f['imgs'].resize(f['imgs'].shape[0] + x.shape[0], axis=0)

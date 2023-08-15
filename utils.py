@@ -495,8 +495,9 @@ class MultiEpochSampler(torch.utils.data.Sampler):
     self.batch_size = batch_size
 
     if not isinstance(self.num_samples, int) or self.num_samples <= 0:
-      raise ValueError("num_samples should be a positive integeral "
-                       "value, but got num_samples={}".format(self.num_samples))
+      raise ValueError(
+          f"num_samples should be a positive integeral value, but got num_samples={self.num_samples}"
+      )
 
   def __iter__(self):
     n = len(self.data_source)
@@ -506,11 +507,9 @@ class MultiEpochSampler(torch.utils.data.Sampler):
     # Sample all the indices, and then grab the last num_epochs index sets;
     # This ensures if we're starting at epoch 4, we're still grabbing epoch 4's
     # indices
-    out = [torch.randperm(n) for epoch in range(self.num_epochs)][-num_epochs:]
+    out = [torch.randperm(n) for _ in range(self.num_epochs)][-num_epochs:]
     # Ignore the first start_itr % n indices of the first epoch
     out[0] = out[0][(self.start_itr * self.batch_size % n):]
-    # if self.replacement:
-      # return iter(torch.randint(high=n, size=(self.num_samples,), dtype=torch.int64).tolist())
     # return iter(.tolist())
     output = torch.cat(out).tolist()
     print('Length dataset output is %d' % len(output))
@@ -528,8 +527,8 @@ def get_data_loaders(dataset, data_root=None, augment=False, batch_size=64,
                      **kwargs):
 
   # Append /FILENAME.hdf5 to root if using hdf5
-  data_root += '/%s' % root_dict[dataset]
-  print('Using dataset root location %s' % data_root)
+  data_root += f'/{root_dict[dataset]}'
+  print(f'Using dataset root location {data_root}')
 
   which_dataset = dset_dict[dataset]
   norm_mean = [0.5,0.5,0.5]
@@ -537,8 +536,8 @@ def get_data_loaders(dataset, data_root=None, augment=False, batch_size=64,
   image_size = imsize_dict[dataset]
   # For image folder datasets, name of the file where we store the precomputed
   # image locations to avoid having to walk the dirs every time we load.
-  dataset_kwargs = {'index_filename': '%s_imgs.npz' % dataset}
-  
+  dataset_kwargs = {'index_filename': f'{dataset}_imgs.npz'}
+
   # HDF5 datasets have their own inbuilt transform, no need to train_transform  
   if 'hdf5' in dataset:
     train_transform = None
@@ -565,9 +564,6 @@ def get_data_loaders(dataset, data_root=None, augment=False, batch_size=64,
   train_set = which_dataset(root=data_root, transform=train_transform,
                             load_in_mem=load_in_mem, **dataset_kwargs)
 
-  # Prepare loader; the loaders list is for forward compatibility with
-  # using validation / test splits.
-  loaders = []   
   if use_multiepoch_sampler:
     print('Using multiepoch sampler from start_itr %d...' % start_itr)
     loader_kwargs = {'num_workers': num_workers, 'pin_memory': pin_memory}
@@ -579,8 +575,7 @@ def get_data_loaders(dataset, data_root=None, augment=False, batch_size=64,
                      'drop_last': drop_last} # Default, drop last incomplete batch
     train_loader = DataLoader(train_set, batch_size=batch_size,
                               shuffle=shuffle, **loader_kwargs)
-  loaders.append(train_loader)
-  return loaders
+  return [train_loader]
 
 
 # Utility file to seed rngs
@@ -594,9 +589,9 @@ def seed_rng(seed):
 # If a base root folder is provided, peg all other root folders to it.
 def update_config_roots(config):
   if config['base_root']:
-    print('Pegging all root folders to base root %s' % config['base_root'])
+    print(f"Pegging all root folders to base root {config['base_root']}")
     for key in ['data', 'weights', 'logs', 'samples']:
-      config['%s_root' % key] = '%s/%s' % (config['base_root'], key)
+      config[f'{key}_root'] = f"{config['base_root']}/{key}"
   return config
 
 
@@ -604,7 +599,7 @@ def update_config_roots(config):
 def prepare_root(config):
   for key in ['weights_root', 'logs_root', 'samples_root']:
     if not os.path.exists(config[key]):
-      print('Making directory %s for %s...' % (config[key], key))
+      print(f'Making directory {config[key]} for {key}...')
       os.mkdir(config[key])
 
 
@@ -630,10 +625,7 @@ class ema(object):
   def update(self, itr=None):
     # If an iteration counter is provided and itr is less than the start itr,
     # peg the ema weights to the underlying weights.
-    if itr and itr < self.start_itr:
-      decay = 0.0
-    else:
-      decay = self.decay
+    decay = 0.0 if itr and itr < self.start_itr else self.decay
     with torch.no_grad():
       for key in self.source_dict:
         self.target_dict[key].data.copy_(self.target_dict[key].data * decay 
@@ -647,7 +639,7 @@ def ortho(model, strength=1e-4, blacklist=[]):
   with torch.no_grad():
     for param in model.parameters():
       # Only apply this to parameters with at least 2 axes, and not in the blacklist
-      if len(param.shape) < 2 or any([param is item for item in blacklist]):
+      if len(param.shape) < 2 or any(param is item for item in blacklist):
         continue
       w = param.view(param.shape[0], -1)
       grad = (2 * torch.mm(torch.mm(w, w.t()) 
@@ -690,22 +682,30 @@ def save_weights(G, D, state_dict, weights_root, experiment_name,
   if not os.path.exists(root):
     os.mkdir(root)
   if name_suffix:
-    print('Saving weights to %s/%s...' % (root, name_suffix))
+    print(f'Saving weights to {root}/{name_suffix}...')
   else:
-    print('Saving weights to %s...' % root)
-  torch.save(G.state_dict(), 
-              '%s/%s.pth' % (root, join_strings('_', ['G', name_suffix])))
-  torch.save(G.optim.state_dict(), 
-              '%s/%s.pth' % (root, join_strings('_', ['G_optim', name_suffix])))
-  torch.save(D.state_dict(), 
-              '%s/%s.pth' % (root, join_strings('_', ['D', name_suffix])))
-  torch.save(D.optim.state_dict(),
-              '%s/%s.pth' % (root, join_strings('_', ['D_optim', name_suffix])))
-  torch.save(state_dict,
-              '%s/%s.pth' % (root, join_strings('_', ['state_dict', name_suffix])))
+    print(f'Saving weights to {root}...')
+  torch.save(G.state_dict(),
+             f"{root}/{join_strings('_', ['G', name_suffix])}.pth")
+  torch.save(
+      G.optim.state_dict(),
+      f"{root}/{join_strings('_', ['G_optim', name_suffix])}.pth",
+  )
+  torch.save(D.state_dict(),
+             f"{root}/{join_strings('_', ['D', name_suffix])}.pth")
+  torch.save(
+      D.optim.state_dict(),
+      f"{root}/{join_strings('_', ['D_optim', name_suffix])}.pth",
+  )
+  torch.save(
+      state_dict,
+      f"{root}/{join_strings('_', ['state_dict', name_suffix])}.pth",
+  )
   if G_ema is not None:
-    torch.save(G_ema.state_dict(), 
-                '%s/%s.pth' % (root, join_strings('_', ['G_ema', name_suffix])))
+    torch.save(
+        G_ema.state_dict(),
+        f"{root}/{join_strings('_', ['G_ema', name_suffix])}.pth",
+    )
 
 
 # Load a model's weights, optimizer, and the state_dict
@@ -713,30 +713,36 @@ def load_weights(G, D, state_dict, weights_root, experiment_name,
                  name_suffix=None, G_ema=None, strict=True, load_optim=True):
   root = '/'.join([weights_root, experiment_name])
   if name_suffix:
-    print('Loading %s weights from %s...' % (name_suffix, root))
+    print(f'Loading {name_suffix} weights from {root}...')
   else:
-    print('Loading weights from %s...' % root)
+    print(f'Loading weights from {root}...')
   if G is not None:
     G.load_state_dict(
-      torch.load('%s/%s.pth' % (root, join_strings('_', ['G', name_suffix]))),
-      strict=strict)
+        torch.load(f"{root}/{join_strings('_', ['G', name_suffix])}.pth"),
+        strict=strict,
+    )
     if load_optim:
       G.optim.load_state_dict(
-        torch.load('%s/%s.pth' % (root, join_strings('_', ['G_optim', name_suffix]))))
+          torch.load(
+              f"{root}/{join_strings('_', ['G_optim', name_suffix])}.pth"))
   if D is not None:
     D.load_state_dict(
-      torch.load('%s/%s.pth' % (root, join_strings('_', ['D', name_suffix]))),
-      strict=strict)
+        torch.load(f"{root}/{join_strings('_', ['D', name_suffix])}.pth"),
+        strict=strict,
+    )
     if load_optim:
       D.optim.load_state_dict(
-        torch.load('%s/%s.pth' % (root, join_strings('_', ['D_optim', name_suffix]))))
+          torch.load(
+              f"{root}/{join_strings('_', ['D_optim', name_suffix])}.pth"))
   # Load state dict
   for item in state_dict:
-    state_dict[item] = torch.load('%s/%s.pth' % (root, join_strings('_', ['state_dict', name_suffix])))[item]
+    state_dict[item] = torch.load(
+        f"{root}/{join_strings('_', ['state_dict', name_suffix])}.pth")[item]
   if G_ema is not None:
     G_ema.load_state_dict(
-      torch.load('%s/%s.pth' % (root, join_strings('_', ['G_ema', name_suffix]))),
-      strict=strict)
+        torch.load(f"{root}/{join_strings('_', ['G_ema', name_suffix])}.pth"),
+        strict=strict,
+    )
 
 
 ''' MetricsLogger originally stolen from VoxNet source code.
@@ -747,7 +753,7 @@ class MetricsLogger(object):
     self.reinitialize = reinitialize
     if os.path.exists(self.fname):
       if self.reinitialize:
-        print('{} exists, deleting...'.format(self.fname))
+        print(f'{self.fname} exists, deleting...')
         os.remove(self.fname)
 
   def log(self, record=None, **kwargs):
@@ -779,15 +785,15 @@ class MyLogger(object):
 
   # Delete log if re-starting and log already exists
   def reinit(self, item):
-    if os.path.exists('%s/%s.log' % (self.root, item)):
+    if os.path.exists(f'{self.root}/{item}.log'):
       if self.reinitialize:
         # Only print the removal mess
-        if 'sv' in item :
-          if not any('sv' in item for item in self.metrics):
+        if 'sv' in item:
+          if all('sv' not in item for item in self.metrics):
             print('Deleting singular value logs...')
         else:
-          print('{} exists, deleting...'.format('%s_%s.log' % (self.root, item)))
-        os.remove('%s/%s.log' % (self.root, item))
+          print(f'{self.root}_{item}.log exists, deleting...')
+        os.remove(f'{self.root}/{item}.log')
   
   # Log in plaintext; this is designed for being read in MATLAB(sorry not sorry)
   def log(self, itr, **kwargs):
@@ -803,14 +809,13 @@ class MyLogger(object):
       elif self.logstyle == 'mat':
         print('.mat logstyle not currently supported...')
       else:
-        with open('%s/%s.log' % (self.root, arg), 'a') as f:
+        with open(f'{self.root}/{arg}.log', 'a') as f:
           f.write('%d: %s\n' % (itr, self.logstyle % kwargs[arg]))
 
 
 # Write some metadata to the logs directory
 def write_metadata(logs_root, experiment_name, config, state_dict):
-  with open(('%s/%s/metalog.txt' % 
-             (logs_root, experiment_name)), 'w') as writefile:
+  with open(f'{logs_root}/{experiment_name}/metalog.txt', 'w') as writefile:
     writefile.write('datetime: %s\n' % str(datetime.datetime.now()))
     writefile.write('config: %s\n' % str(config))
     writefile.write('state: %s\n' %str(state_dict))
@@ -841,18 +846,17 @@ def progress(items, desc='', total=None, min_delay=0.1, displaytype='s1k'):
               desc, n+1, total, n / float(total) * 100), end=" ")
       if n > 0:
         
+        t_done = t_now - t_start
         if displaytype == 's1k': # minutes/seconds for 1000 iters
           next_1000 = n + (1000 - n%1000)
-          t_done = t_now - t_start
           t_1k = t_done / n * next_1000
           outlist = list(divmod(t_done, 60)) + list(divmod(t_1k - t_done, 60))
           print("(TE/ET1k: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
         else:# displaytype == 'eta':
-          t_done = t_now - t_start
           t_total = t_done / n * total
           outlist = list(divmod(t_done, 60)) + list(divmod(t_total - t_done, 60))
           print("(TE/ETA: %d:%02d / %d:%02d)" % tuple(outlist), end=" ")
-          
+
       sys.stdout.flush()
       t_last = t_now
     yield item
@@ -877,25 +881,23 @@ def sample(G, z_, y_, config):
 def sample_sheet(G, classes_per_sheet, num_classes, samples_per_class, parallel,
                  samples_root, experiment_name, folder_number, z_=None):
   # Prepare sample directory
-  if not os.path.isdir('%s/%s' % (samples_root, experiment_name)):
-    os.mkdir('%s/%s' % (samples_root, experiment_name))
+  if not os.path.isdir(f'{samples_root}/{experiment_name}'):
+    os.mkdir(f'{samples_root}/{experiment_name}')
   if not os.path.isdir('%s/%s/%d' % (samples_root, experiment_name, folder_number)):
     os.mkdir('%s/%s/%d' % (samples_root, experiment_name, folder_number))
   # loop over total number of sheets
   for i in range(num_classes // classes_per_sheet):
     ims = []
     y = torch.arange(i * classes_per_sheet, (i + 1) * classes_per_sheet, device='cuda')
-    for j in range(samples_per_class):
+    for _ in range(samples_per_class):
       if (z_ is not None) and hasattr(z_, 'sample_') and classes_per_sheet <= z_.size(0):
         z_.sample_()
       else:
-        z_ = torch.randn(classes_per_sheet, G.dim_z, device='cuda')        
+        z_ = torch.randn(classes_per_sheet, G.dim_z, device='cuda')
       with torch.no_grad():
-        if parallel:
-          o = nn.parallel.data_parallel(G, (z_[:classes_per_sheet], G.shared(y)))
-        else:
-          o = G(z_[:classes_per_sheet], G.shared(y))
-
+        o = (nn.parallel.data_parallel(G,
+                                       (z_[:classes_per_sheet], G.shared(y)))
+             if parallel else G(z_[:classes_per_sheet], G.shared(y)))
       ims += [o.data.cpu()]
     # This line should properly unroll the images
     out_ims = torch.stack(ims, 1).view(-1, ims[0].shape[1], ims[0].shape[2], 
@@ -967,67 +969,70 @@ def print_grad_norms(net):
 # and substitute underscores for dots.
 def get_SVs(net, prefix):
   d = net.state_dict()
-  return {('%s_%s' % (prefix, key)).replace('.', '_') :
-            float(d[key].item())
-            for key in d if 'sv' in key}
+  return {
+      f'{prefix}_{key}'.replace('.', '_'): float(d[key].item())
+      for key in d if 'sv' in key
+  }
 
 
 # Name an experiment based on its config
 def name_from_config(config):
   name = '_'.join([
-  item for item in [
-  'Big%s' % config['which_train_fn'],
-  config['dataset'],
-  config['model'] if config['model'] != 'BigGAN' else None,
-  'seed%d' % config['seed'],
-  'Gch%d' % config['G_ch'],
-  'Dch%d' % config['D_ch'],
-  'Gd%d' % config['G_depth'] if config['G_depth'] > 1 else None,
-  'Dd%d' % config['D_depth'] if config['D_depth'] > 1 else None,
-  'bs%d' % config['batch_size'],
-  'Gfp16' if config['G_fp16'] else None,
-  'Dfp16' if config['D_fp16'] else None,
-  'nDs%d' % config['num_D_steps'] if config['num_D_steps'] > 1 else None,
-  'nDa%d' % config['num_D_accumulations'] if config['num_D_accumulations'] > 1 else None,
-  'nGa%d' % config['num_G_accumulations'] if config['num_G_accumulations'] > 1 else None,
-  'Glr%2.1e' % config['G_lr'],
-  'Dlr%2.1e' % config['D_lr'],
-  'GB%3.3f' % config['G_B1'] if config['G_B1'] !=0.0 else None,
-  'GBB%3.3f' % config['G_B2'] if config['G_B2'] !=0.999 else None,
-  'DB%3.3f' % config['D_B1'] if config['D_B1'] !=0.0 else None,
-  'DBB%3.3f' % config['D_B2'] if config['D_B2'] !=0.999 else None,
-  'Gnl%s' % config['G_nl'],
-  'Dnl%s' % config['D_nl'],
-  'Ginit%s' % config['G_init'],
-  'Dinit%s' % config['D_init'],
-  'G%s' % config['G_param'] if config['G_param'] != 'SN' else None,
-  'D%s' % config['D_param'] if config['D_param'] != 'SN' else None,
-  'Gattn%s' % config['G_attn'] if config['G_attn'] != '0' else None,
-  'Dattn%s' % config['D_attn'] if config['D_attn'] != '0' else None,
-  'Gortho%2.1e' % config['G_ortho'] if config['G_ortho'] > 0.0 else None,
-  'Dortho%2.1e' % config['D_ortho'] if config['D_ortho'] > 0.0 else None,
-  config['norm_style'] if config['norm_style'] != 'bn' else None,
-  'cr' if config['cross_replica'] else None,
-  'Gshared' if config['G_shared'] else None,
-  'hier' if config['hier'] else None,
-  'ema' if config['ema'] else None,
-  config['name_suffix'] if config['name_suffix'] else None,
-  ]
-  if item is not None])
+      item for item in [
+          f"Big{config['which_train_fn']}",
+          config['dataset'],
+          config['model'] if config['model'] != 'BigGAN' else None,
+          'seed%d' % config['seed'],
+          'Gch%d' % config['G_ch'],
+          'Dch%d' % config['D_ch'],
+          'Gd%d' % config['G_depth'] if config['G_depth'] > 1 else None,
+          'Dd%d' % config['D_depth'] if config['D_depth'] > 1 else None,
+          'bs%d' % config['batch_size'],
+          'Gfp16' if config['G_fp16'] else None,
+          'Dfp16' if config['D_fp16'] else None,
+          'nDs%d' %
+          config['num_D_steps'] if config['num_D_steps'] > 1 else None,
+          'nDa%d' % config['num_D_accumulations']
+          if config['num_D_accumulations'] > 1 else None,
+          'nGa%d' % config['num_G_accumulations']
+          if config['num_G_accumulations'] > 1 else None,
+          'Glr%2.1e' % config['G_lr'],
+          'Dlr%2.1e' % config['D_lr'],
+          'GB%3.3f' % config['G_B1'] if config['G_B1'] != 0.0 else None,
+          'GBB%3.3f' % config['G_B2'] if config['G_B2'] != 0.999 else None,
+          'DB%3.3f' % config['D_B1'] if config['D_B1'] != 0.0 else None,
+          'DBB%3.3f' % config['D_B2'] if config['D_B2'] != 0.999 else None,
+          f"Gnl{config['G_nl']}",
+          f"Dnl{config['D_nl']}",
+          f"Ginit{config['G_init']}",
+          f"Dinit{config['D_init']}",
+          f"G{config['G_param']}" if config['G_param'] != 'SN' else None,
+          f"D{config['D_param']}" if config['D_param'] != 'SN' else None,
+          f"Gattn{config['G_attn']}" if config['G_attn'] != '0' else None,
+          f"Dattn{config['D_attn']}" if config['D_attn'] != '0' else None,
+          'Gortho%2.1e' %
+          config['G_ortho'] if config['G_ortho'] > 0.0 else None,
+          'Dortho%2.1e' %
+          config['D_ortho'] if config['D_ortho'] > 0.0 else None,
+          config['norm_style'] if config['norm_style'] != 'bn' else None,
+          'cr' if config['cross_replica'] else None,
+          'Gshared' if config['G_shared'] else None,
+          'hier' if config['hier'] else None,
+          'ema' if config['ema'] else None,
+          config['name_suffix'] if config['name_suffix'] else None,
+      ] if item is not None
+  ])
   # dogball
-  if config['hashname']:
-    return hashname(name)
-  else:
-    return name
+  return hashname(name) if config['hashname'] else name
 
 
 # A simple function to produce a unique experiment name from the animal hashes.
 def hashname(name):
   h = hash(name)
   a = h % len(animal_hash.a)
-  h = h // len(animal_hash.a)
+  h //= len(animal_hash.a)
   b = h % len(animal_hash.b)
-  h = h // len(animal_hash.c)
+  h //= len(animal_hash.c)
   c = h % len(animal_hash.c)
   return animal_hash.a[a] + animal_hash.b[b] + animal_hash.c[c]
 
@@ -1039,8 +1044,9 @@ def query_gpu(indices):
 
 # Convenience function to count the number of parameters in a module
 def count_parameters(module):
-  print('Number of parameters: {}'.format(
-    sum([p.data.nelement() for p in module.parameters()])))
+  print(
+      f'Number of parameters: {sum(p.data.nelement() for p in module.parameters())}'
+  )
 
    
 # Convenience function to sample an index, not actually a 1-hot
@@ -1108,7 +1114,7 @@ def initiate_standing_stats(net):
 def accumulate_standing_stats(net, z, y, nclasses, num_accumulations=16):
   initiate_standing_stats(net)
   net.train()
-  for i in range(num_accumulations):
+  for _ in range(num_accumulations):
     with torch.no_grad():
       z.normal_()
       y.random_(0, nclasses)
@@ -1147,15 +1153,12 @@ class Adam16(Optimizer):
       closure (callable, optional): A closure that reevaluates the model
         and returns the loss.
     """
-    loss = None
-    if closure is not None:
-      loss = closure()
-
+    loss = closure() if closure is not None else None
     for group in self.param_groups:
       for p in group['params']:
         if p.grad is None:
           continue
-          
+
         grad = p.grad.data.float()
         state = self.state[p]
 
@@ -1186,7 +1189,7 @@ class Adam16(Optimizer):
         bias_correction1 = 1 - beta1 ** state['step']
         bias_correction2 = 1 - beta2 ** state['step']
         step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
-      
+
         state['fp32_p'].addcdiv_(-step_size, exp_avg, denom)
         p.data = state['fp32_p'].half()
 

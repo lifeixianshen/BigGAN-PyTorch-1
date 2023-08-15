@@ -9,8 +9,7 @@ def loss_dcgan_dis(dis_fake, dis_real):
 
 
 def loss_dcgan_gen(dis_fake):
-  loss = torch.mean(F.softplus(-dis_fake))
-  return loss
+  return torch.mean(F.softplus(-dis_fake))
 
 
 # Hinge Loss
@@ -25,8 +24,7 @@ def loss_hinge_dis(dis_fake, dis_real):
 
 
 def loss_hinge_gen(dis_fake):
-  loss = -torch.mean(dis_fake)
-  return loss
+  return -torch.mean(dis_fake)
 
 # Default to hinge loss
 generator_loss = loss_hinge_gen

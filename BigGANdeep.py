@@ -65,13 +65,18 @@ class GBlock(nn.Module):
     return h + x
 
 def G_arch(ch=64, attention='64', ksize='333333', dilation='111111'):
-  arch = {}
-  arch[256] = {'in_channels' :  [ch * item for item in [16, 16, 8, 8, 4, 2]],
-               'out_channels' : [ch * item for item in [16,  8, 8, 4, 2, 1]],
-               'upsample' : [True] * 6,
-               'resolution' : [8, 16, 32, 64, 128, 256],
-               'attention' : {2**i: (2**i in [int(item) for item in attention.split('_')])
-                              for i in range(3,9)}}
+  arch = {
+      256: {
+          'in_channels': [ch * item for item in [16, 16, 8, 8, 4, 2]],
+          'out_channels': [ch * item for item in [16, 8, 8, 4, 2, 1]],
+          'upsample': [True] * 6,
+          'resolution': [8, 16, 32, 64, 128, 256],
+          'attention': {
+              2**i: (2**i in [int(item) for item in attention.split('_')])
+              for i in range(3, 9)
+          },
+      }
+  }
   arch[128] = {'in_channels' :  [ch * item for item in [16, 16, 8, 4, 2]],
                'out_channels' : [ch * item for item in [16, 8, 4,  2, 1]],
                'upsample' : [True] * 5,
@@ -243,9 +248,7 @@ class Generator(nn.Module):
   def init_weights(self):
     self.param_count = 0
     for module in self.modules():
-      if (isinstance(module, nn.Conv2d) 
-          or isinstance(module, nn.Linear) 
-          or isinstance(module, nn.Embedding)):
+      if isinstance(module, (nn.Conv2d, nn.Linear, nn.Embedding)):
         if self.init == 'ortho':
           init.orthogonal_(module.weight)
         elif self.init == 'N02':
@@ -254,7 +257,7 @@ class Generator(nn.Module):
           init.xavier_uniform_(module.weight)
         else:
           print('Init style not recognized...')
-        self.param_count += sum([p.data.nelement() for p in module.parameters()])
+        self.param_count += sum(p.data.nelement() for p in module.parameters())
     print('Param count for G''s initialized parameters: %d' % self.param_count)
 
   # Note on this forward function: we pass in a y vector which has
@@ -270,13 +273,13 @@ class Generator(nn.Module):
     # First linear layer
     h = self.linear(z)
     # Reshape
-    h = h.view(h.size(0), -1, self.bottom_width, self.bottom_width)    
+    h = h.view(h.size(0), -1, self.bottom_width, self.bottom_width)
     # Loop over blocks
-    for index, blocklist in enumerate(self.blocks):
+    for blocklist in self.blocks:
       # Second inner loop in case block has multiple layers
       for block in blocklist:
         h = block(h, y)
-        
+
     # Apply batchnorm-relu-conv-tanh at output
     return torch.tanh(self.output_layer(h))
 
@@ -292,7 +295,7 @@ class DBlock(nn.Module):
     self.preactivation = preactivation
     self.activation = activation
     self.downsample = downsample
-        
+
     # Conv layers
     self.conv1 = self.which_conv(self.in_channels, self.hidden_channels, 
                                  kernel_size=1, padding=0)
@@ -300,8 +303,8 @@ class DBlock(nn.Module):
     self.conv3 = self.which_conv(self.hidden_channels, self.hidden_channels)
     self.conv4 = self.which_conv(self.hidden_channels, self.out_channels, 
                                  kernel_size=1, padding=0)
-                                 
-    self.learnable_sc = True if (in_channels != out_channels) else False
+
+    self.learnable_sc = in_channels != out_channels
     if self.learnable_sc:
       self.conv_sc = self.which_conv(in_channels, out_channels - in_channels, 
                                      kernel_size=1, padding=0)
@@ -329,13 +332,18 @@ class DBlock(nn.Module):
     
 # Discriminator architecture, same paradigm as G's above
 def D_arch(ch=64, attention='64',ksize='333333', dilation='111111'):
-  arch = {}
-  arch[256] = {'in_channels' :  [item * ch for item in [1, 2, 4, 8, 8, 16]],
-               'out_channels' : [item * ch for item in [2, 4, 8, 8, 16, 16]],
-               'downsample' : [True] * 6 + [False],
-               'resolution' : [128, 64, 32, 16, 8, 4, 4 ],
-               'attention' : {2**i: 2**i in [int(item) for item in attention.split('_')]
-                              for i in range(2,8)}}
+  arch = {
+      256: {
+          'in_channels': [item * ch for item in [1, 2, 4, 8, 8, 16]],
+          'out_channels': [item * ch for item in [2, 4, 8, 8, 16, 16]],
+          'downsample': [True] * 6 + [False],
+          'resolution': [128, 64, 32, 16, 8, 4, 4],
+          'attention': {
+              2**i: 2**i in [int(item) for item in attention.split('_')]
+              for i in range(2, 8)
+          },
+      }
+  }
   arch[128] = {'in_channels' :  [item * ch for item in [1, 2, 4,  8, 16]],
                'out_channels' : [item * ch for item in [2, 4, 8, 16, 16]],
                'downsample' : [True] * 5 + [False],
@@ -458,9 +466,7 @@ class Discriminator(nn.Module):
   def init_weights(self):
     self.param_count = 0
     for module in self.modules():
-      if (isinstance(module, nn.Conv2d)
-          or isinstance(module, nn.Linear)
-          or isinstance(module, nn.Embedding)):
+      if isinstance(module, (nn.Conv2d, nn.Linear, nn.Embedding)):
         if self.init == 'ortho':
           init.orthogonal_(module.weight)
         elif self.init == 'N02':
@@ -469,14 +475,14 @@ class Discriminator(nn.Module):
           init.xavier_uniform_(module.weight)
         else:
           print('Init style not recognized...')
-        self.param_count += sum([p.data.nelement() for p in module.parameters()])
+        self.param_count += sum(p.data.nelement() for p in module.parameters())
     print('Param count for D''s initialized parameters: %d' % self.param_count)
 
   def forward(self, x, y=None):
     # Run input conv
     h = self.input_conv(x)
     # Loop over blocks
-    for index, blocklist in enumerate(self.blocks):
+    for blocklist in self.blocks:
       for block in blocklist:
         h = block(h)
     # Apply global sum pooling as in SN-GAN
@@ -510,16 +516,10 @@ class G_D(nn.Module):
     # rather than concatenating along the batch dimension.
     if split_D:
       D_fake = self.D(G_z, gy)
-      if x is not None:
-        D_real = self.D(x, dy)
-        return D_fake, D_real
-      else:
-        if return_G_z:
-          return D_fake, G_z
-        else:
-          return D_fake
-    # If real data is provided, concatenate it with the Generator's output
-    # along the batch dimension for improved efficiency.
+      if x is None:
+        return (D_fake, G_z) if return_G_z else D_fake
+      D_real = self.D(x, dy)
+      return D_fake, D_real
     else:
       D_input = torch.cat([G_z, x], 0) if x is not None else G_z
       D_class = torch.cat([gy, dy], 0) if dy is not None else gy
@@ -528,7 +528,4 @@ class G_D(nn.Module):
       if x is not None:
         return torch.split(D_out, [G_z.shape[0], x.shape[0]]) # D_fake, D_real
       else:
-        if return_G_z:
-          return D_out, G_z
-        else:
-          return D_out
+        return (D_out, G_z) if return_G_z else D_out

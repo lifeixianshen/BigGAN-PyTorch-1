@@ -107,37 +107,40 @@ class ImageFolder(data.Dataset):
   def __init__(self, root, transform=None, target_transform=None,
                loader=default_loader, load_in_mem=False, 
                index_filename='imagenet_imgs.npz', **kwargs):
-    classes, class_to_idx = find_classes(root)
-    # Load pre-computed image directory walk
-    if os.path.exists(index_filename):
-      print('Loading pre-saved Index file %s...' % index_filename)
-      imgs = np.load(index_filename)['imgs']
-    # If first time, walk the folder directory and save the 
-    # results to a pre-computed file.
-    else:
-      print('Generating  Index file %s...' % index_filename)
-      imgs = make_dataset(root, class_to_idx)
-      np.savez_compressed(index_filename, **{'imgs' : imgs})
-    if len(imgs) == 0:
-      raise(RuntimeError("Found 0 images in subfolders of: " + root + "\n"
-                           "Supported image extensions are: " + ",".join(IMG_EXTENSIONS)))
+      classes, class_to_idx = find_classes(root)
+        # Load pre-computed image directory walk
+      if os.path.exists(index_filename):
+          print(f'Loading pre-saved Index file {index_filename}...')
+          imgs = np.load(index_filename)['imgs']
+      else:
+          print(f'Generating  Index file {index_filename}...')
+          imgs = make_dataset(root, class_to_idx)
+          np.savez_compressed(index_filename, **{'imgs' : imgs})
+      if len(imgs) == 0:
+          raise RuntimeError(
+              (
+                  f"Found 0 images in subfolders of: {root}" + "\n"
+                  "Supported image extensions are: "
+              )
+              + ",".join(IMG_EXTENSIONS)
+          )
 
-    self.root = root
-    self.imgs = imgs
-    self.classes = classes
-    self.class_to_idx = class_to_idx
-    self.transform = transform
-    self.target_transform = target_transform
-    self.loader = loader
-    self.load_in_mem = load_in_mem
-    
-    if self.load_in_mem:
-      print('Loading all images into memory...')
-      self.data, self.labels = [], []
-      for index in tqdm(range(len(self.imgs))):
-        path, target = imgs[index][0], imgs[index][1]
-        self.data.append(self.transform(self.loader(path)))
-        self.labels.append(target)
+      self.root = root
+      self.imgs = imgs
+      self.classes = classes
+      self.class_to_idx = class_to_idx
+      self.transform = transform
+      self.target_transform = target_transform
+      self.loader = loader
+      self.load_in_mem = load_in_mem
+
+      if self.load_in_mem:
+        print('Loading all images into memory...')
+        self.data, self.labels = [], []
+        for index in tqdm(range(len(self.imgs))):
+          path, target = imgs[index][0], imgs[index][1]
+          self.data.append(self.transform(self.loader(path)))
+          self.labels.append(target)
           
 
   def __getitem__(self, index):
@@ -167,14 +170,14 @@ class ImageFolder(data.Dataset):
     return len(self.imgs)
 
   def __repr__(self):
-    fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
-    fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
-    fmt_str += '    Root Location: {}\n'.format(self.root)
-    tmp = '    Transforms (if any): '
-    fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
-    tmp = '    Target Transforms (if any): '
-    fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
-    return fmt_str
+      fmt_str = f'Dataset {self.__class__.__name__}' + '\n'
+      fmt_str += f'    Number of datapoints: {self.__len__()}\n'
+      fmt_str += f'    Root Location: {self.root}\n'
+      tmp = '    Transforms (if any): '
+      fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+      tmp = '    Target Transforms (if any): '
+      fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+      return fmt_str
         
 
 ''' ILSVRC_HDF5: A dataset to support I/O from an HDF5 to avoid
@@ -186,24 +189,24 @@ class ILSVRC_HDF5(data.Dataset):
                load_in_mem=False, train=True,download=False, validate_seed=0,
                val_split=0, **kwargs): # last four are dummies
       
-    self.root = root
-    self.num_imgs = len(h5.File(root, 'r')['labels'])
-    
-    # self.transform = transform
-    self.target_transform = target_transform   
-    
-    # Set the transform here
-    self.transform = transform
-    
-    # load the entire dataset into memory? 
-    self.load_in_mem = load_in_mem
-    
-    # If loading into memory, do so now
-    if self.load_in_mem:
-      print('Loading %s into memory...' % root)
-      with h5.File(root,'r') as f:
-        self.data = f['imgs'][:]
-        self.labels = f['labels'][:]
+      self.root = root
+      self.num_imgs = len(h5.File(root, 'r')['labels'])
+
+      # self.transform = transform
+      self.target_transform = target_transform   
+
+      # Set the transform here
+      self.transform = transform
+
+      # load the entire dataset into memory? 
+      self.load_in_mem = load_in_mem
+
+        # If loading into memory, do so now
+      if self.load_in_mem:
+          print(f'Loading {root} into memory...')
+          with h5.File(root,'r') as f:
+            self.data = f['imgs'][:]
+            self.labels = f['labels'][:]
 
   def __getitem__(self, index):
     """
@@ -246,81 +249,70 @@ class CIFAR10(dset.CIFAR10):
            transform=None, target_transform=None,
            download=True, validate_seed=0,
            val_split=0, load_in_mem=True, **kwargs):
-    self.root = os.path.expanduser(root)
-    self.transform = transform
-    self.target_transform = target_transform
-    self.train = train  # training set or test set
-    self.val_split = val_split
+      self.root = os.path.expanduser(root)
+      self.transform = transform
+      self.target_transform = target_transform
+      self.train = train  # training set or test set
+      self.val_split = val_split
 
-    if download:
-      self.download()
+      if download:
+        self.download()
 
-    if not self._check_integrity():
-      raise RuntimeError('Dataset not found or corrupted.' +
-                           ' You can use download=True to download it')
+      if not self._check_integrity():
+        raise RuntimeError('Dataset not found or corrupted.' +
+                             ' You can use download=True to download it')
 
-    # now load the picked numpy arrays    
-    self.data = []
-    self.labels= []
-    for fentry in self.train_list:
-      f = fentry[0]
-      file = os.path.join(self.root, self.base_folder, f)
-      fo = open(file, 'rb')
-      if sys.version_info[0] == 2:
-        entry = pickle.load(fo)
-      else:
-        entry = pickle.load(fo, encoding='latin1')
-      self.data.append(entry['data'])
-      if 'labels' in entry:
-        self.labels += entry['labels']
-      else:
-        self.labels += entry['fine_labels']
-      fo.close()
-        
-    self.data = np.concatenate(self.data)
-    # Randomly select indices for validation
-    if self.val_split > 0:
-      label_indices = [[] for _ in range(max(self.labels)+1)]
-      for i,l in enumerate(self.labels):
-        label_indices[l] += [i]  
-      label_indices = np.asarray(label_indices)
-      
-      # randomly grab 500 elements of each class
-      np.random.seed(validate_seed)
-      self.val_indices = []           
-      for l_i in label_indices:
-        self.val_indices += list(l_i[np.random.choice(len(l_i), int(len(self.data) * val_split) // (max(self.labels) + 1) ,replace=False)])
-    
-    if self.train=='validate':    
-      self.data = self.data[self.val_indices]
-      self.labels = list(np.asarray(self.labels)[self.val_indices])
-      
-      self.data = self.data.reshape((int(50e3 * self.val_split), 3, 32, 32))
-      self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
-    
-    elif self.train:
-      print(np.shape(self.data))
+      # now load the picked numpy arrays    
+      self.data = []
+      self.labels= []
+      for fentry in self.train_list:
+          f = fentry[0]
+          file = os.path.join(self.root, self.base_folder, f)
+          with open(file, 'rb') as fo:
+              if sys.version_info[0] == 2:
+                entry = pickle.load(fo)
+              else:
+                entry = pickle.load(fo, encoding='latin1')
+              self.data.append(entry['data'])
+              self.labels += entry['labels'] if 'labels' in entry else entry['fine_labels']
+      self.data = np.concatenate(self.data)
+      # Randomly select indices for validation
       if self.val_split > 0:
-        self.data = np.delete(self.data,self.val_indices,axis=0)
-        self.labels = list(np.delete(np.asarray(self.labels),self.val_indices,axis=0))
-          
-      self.data = self.data.reshape((int(50e3 * (1.-self.val_split)), 3, 32, 32))
-      self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
-    else:
-      f = self.test_list[0][0]
-      file = os.path.join(self.root, self.base_folder, f)
-      fo = open(file, 'rb')
-      if sys.version_info[0] == 2:
-        entry = pickle.load(fo)
+        label_indices = [[] for _ in range(max(self.labels)+1)]
+        for i,l in enumerate(self.labels):
+          label_indices[l] += [i]  
+        label_indices = np.asarray(label_indices)
+
+        # randomly grab 500 elements of each class
+        np.random.seed(validate_seed)
+        self.val_indices = []           
+        for l_i in label_indices:
+          self.val_indices += list(l_i[np.random.choice(len(l_i), int(len(self.data) * val_split) // (max(self.labels) + 1) ,replace=False)])
+
+      if self.train=='validate':
+          self.data = self.data[self.val_indices]
+          self.labels = list(np.asarray(self.labels)[self.val_indices])
+
+          self.data = self.data.reshape((int(50e3 * self.val_split), 3, 32, 32))
+      elif self.train:
+          print(np.shape(self.data))
+          if self.val_split > 0:
+            self.data = np.delete(self.data,self.val_indices,axis=0)
+            self.labels = list(np.delete(np.asarray(self.labels),self.val_indices,axis=0))
+
+          self.data = self.data.reshape((int(50e3 * (1.-self.val_split)), 3, 32, 32))
       else:
-        entry = pickle.load(fo, encoding='latin1')
-      self.data = entry['data']
-      if 'labels' in entry:
-        self.labels = entry['labels']
-      else:
-        self.labels = entry['fine_labels']
-      fo.close()
-      self.data = self.data.reshape((10000, 3, 32, 32))
+          f = self.test_list[0][0]
+          file = os.path.join(self.root, self.base_folder, f)
+          with open(file, 'rb') as fo:
+              if sys.version_info[0] == 2:
+                entry = pickle.load(fo)
+              else:
+                entry = pickle.load(fo, encoding='latin1')
+              self.data = entry['data']
+              self.labels = entry['labels'] if 'labels' in entry else entry['fine_labels']
+          self.data = self.data.reshape((10000, 3, 32, 32))
+
       self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
       
   def __getitem__(self, index):
